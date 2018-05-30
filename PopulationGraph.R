@@ -1,3 +1,7 @@
+#
+# Author: Tyler Jubenville
+# This script currently pulls population age data from the American Community Survey 5 year data from 2011-2016 and plots it.
+
 rm(list=ls())
 library (RJSONIO)
 library(dplyr)
@@ -5,22 +9,15 @@ library(ggplot2)
 library(tidyr)
 source("ACSReqs.R")
 
+# Import APIkey from text file.
 fileName <- "APIkey.txt"
 APIkey = readChar(fileName, file.info(fileName)$size)
 
-#Total population and percent in age brackets
-varname <- paste("S0101_C01_002E","S0101_C01_003E","S0101_C01_004E",sep=",")
-#"S0101_C01_005E","S0101_C01_006E","S0101_C01_007E",
-#"S0101_C01_008E","S0101_C01_009E","S0101_C01_010E",
-#"S0101_C01_011E","S0101_C01_012E","S0101_C01_013E",
-#"S0101_C01_014E","S0101_C01_015E","S0101_C01_016E",
-#"S0101_C01_017E","S0101_C01_018E","S0101_C01_019E",sep=",")
-
-#varname <- paste("S0101_C01_001E","S0101_C01_002E","S0101_C01_003E",sep=",")
-#Sate number for TN
+# Sate number for TN
 state <- "47"
 year <- c("2009","2010","2011","2012","2013","2014","2015","2016")
 
+# Add all age variables by variable gender to the 
 varname <- paste("B01001_001E","B01001_002E","B01001_003E",
                  "B01001_004E","B01001_005E","B01001_006E",
                  "B01001_007E","B01001_008E","B01001_009E",
@@ -38,7 +35,10 @@ varname <- paste("B01001_001E","B01001_002E","B01001_003E",
                  "B01001_043E","B01001_044E","B01001_045E",
                  "B01001_046E","B01001_047E","B01001_048E",
                  "B01001_049E",sep=",")
+# Empty dataframe for combining all the data
 ACSData <- data.frame()
+
+# Actually pull all of the data from the API and combine it
 for (i in year){
   print(i)
   temp <- getACSDataState("5",i,varname,state,APIkey)
@@ -46,6 +46,7 @@ for (i in year){
   ACSData <- dplyr::bind_rows(ACSData,temp)
 }
 
+# Adding variables for Population percentage calculation
 ACSData <- mutate(ACSData,
                   MalesUnder18=(B01001_003E+B01001_004E+B01001_005E+B01001_006E)/B01001_001E*100,
                   Males18to24=(B01001_007E+B01001_008E+B01001_009E+B01001_010E)/B01001_001E*100,
@@ -61,11 +62,15 @@ ACSData <- mutate(ACSData,
                   Females45to54=(B01001_039E+B01001_040E)/B01001_001E*100,
                   Females55to64=(B01001_041E+B01001_042E+B01001_043E)/B01001_001E*100,
                   FemalesOver64=(B01001_044E+B01001_045E+B01001_046E+B01001_047E+B01001_048E+B01001_049E)/B01001_001E*100)
-head(ACSData)
+
+# Select percent variables and convert from Wide to Tall for plotting
 plotData <- ACSData[52:66]
 tallData <- gather(plotData,"Group","Percent",2:15)
-ggplot(data=tallData, aes(x=Year, y=Percent, group=Group)) + geom_line(aes(color=Group)) + geom_point(aes(color=Group)) + ggtitle("US Population based on ACS Data - Gender")
+ggplot(data=tallData, aes(x=Year, y=Percent, group=Group)) + 
+       geom_line(aes(color=Group)) + geom_point(aes(color=Group)) + 
+       ggtitle("TN Population based on ACS Data - Gender")
 
+# Combine Gender percentages in ageData dataframe for plotting
 ageData <- transmute(plotData, Year=Year,
                      PopUnder18=MalesUnder18+FemalesUnder18,
                      Pop18to24=Males18to24+Females18to24,
@@ -74,7 +79,8 @@ ageData <- transmute(plotData, Year=Year,
                      Pop45to54=Males45to54+Females45to54,
                      Pop55to64=Males55to64+Females55to64,
                      PopOver64=MalesOver64+FemalesOver64)
-
+# Repeat plotting.
 tallData2 <- gather(ageData,"Group","Percent",2:8)
-ggplot(data=tallData2, aes(x=Year, y=Percent, group=Group)) + geom_line(aes(color=Group)) + geom_point(aes(color=Group)) + ggtitle("US Population based on ACS Data")
-
+ggplot(data=tallData2, aes(x=Year, y=Percent, group=Group)) + 
+       geom_line(aes(color=Group)) + geom_point(aes(color=Group)) + 
+       ggtitle("TN Population based on ACS Data")
